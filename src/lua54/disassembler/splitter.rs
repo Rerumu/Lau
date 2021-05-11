@@ -85,9 +85,10 @@ impl Splitter {
 			.collect();
 	}
 
-	fn get_offset_target(&self, dest: usize, offset: i32) -> Target {
+	fn get_offset_target(&self, post: usize, offset: i32) -> Target {
 		// nasty; we count the index of the label before our destination
-		let index = self.label_set.range(0..=dest).count();
+		let dest = post as i32 + offset;
+		let index = self.label_set.range(0..=dest as usize).count();
 
 		// an out of bounds destination means the jump was either
 		// past the last instruction or before the first one
@@ -103,19 +104,14 @@ impl Splitter {
 		let mut list = Vec::new();
 		let mut prev = 0;
 
-		for pc in self.label_set.iter().skip(1) {
-			let code = iter.by_ref().take(pc - prev).collect();
-			let target = match self.target_map.get(&(pc - 1)) {
-				Some(offset) => {
-					// no +1 because technically our jump is 1 pc behind
-					let dest = *pc as i32 + offset;
+		for pc in self.label_set.iter().skip(1).map(|v| v - 1) {
+			let offset = self.target_map.get(&pc).copied().unwrap_or_default();
+			let post = pc + 1;
 
-					self.get_offset_target(dest as usize, *offset)
-				}
-				None => Target::Undefined(0),
-			};
+			let code = iter.by_ref().take(post - prev).collect();
+			let target = self.get_offset_target(post, offset);
 
-			prev = *pc;
+			prev = post;
 			list.push(Block { code, target });
 		}
 
