@@ -76,7 +76,7 @@ fn disassemble_data(data: &[u8], opt: &[Mutation]) -> Result<()> {
 }
 
 fn list_help() {
-	println!("usage: ldu [options]");
+	println!("usage: lau [options]");
 	println!("  -h | --help                show the help message");
 	println!("  -a | --assemble [file]     assemble a RON file into bytecode");
 	println!("  -d | --disassemble [file]  disassemble a bytecode file into RON");
