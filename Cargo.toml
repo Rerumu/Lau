@@ -1,0 +1,16 @@
+[package]
+name = "ldu"
+version = "0.1.0"
+authors = ["Rerumu"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+bit_field = "0.10.1"
+convert_case = "0.4.0"
+nom = "6.1.2"
+num_enum = "0.5.1"
+rand = "0.8.3"
+ron = "0.6.4"
+serde = {version = "1.0.125", features = ["derive", "rc"]}
