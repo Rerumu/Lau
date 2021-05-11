@@ -42,7 +42,8 @@ impl Splitter {
 
 		for (pc, inst) in code.iter().enumerate() {
 			match inst.opcode() {
-				Opcode::Test
+				Opcode::LFalseSkip
+				| Opcode::Test
 				| Opcode::TestSet
 				| Opcode::Eq
 				| Opcode::Lt

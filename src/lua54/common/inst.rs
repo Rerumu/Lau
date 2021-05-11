@@ -105,7 +105,6 @@ pub enum IR {
 	LoadK(Reg, Rc<str>),
 	LoadKX(Reg),
 	LoadFalse(Reg),
-	LFalseSkip(Reg),
 	LoadTrue(Reg),
 	LoadNil(Reg, u8),
 	GetUpval(Reg, Rc<str>),
@@ -222,6 +221,7 @@ pub enum Condition {
 
 #[derive(Deserialize, Serialize)]
 pub enum Control {
+	LFalseSkip(Reg, Target),
 	Condition(Condition, Target, Target),
 	Loop(Loop, Target, Target),
 	Return(Reg, Group, u8, bool),

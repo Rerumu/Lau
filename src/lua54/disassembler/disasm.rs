@@ -119,6 +119,7 @@ impl Translator {
 			Opcode::TForPrep => Self::gen_loop(last, on_true, on_false, Loop::IteratorPrep),
 			Opcode::ForLoop => Self::gen_loop(last, on_true, on_false, Loop::Numeric),
 			Opcode::ForPrep => Self::gen_loop(last, on_true, on_false, Loop::NumericPrep),
+			Opcode::LFalseSkip => Control::LFalseSkip(last.a().into(), on_true),
 			Opcode::Test => {
 				let (on_true, on_false) = swap_if_k(last, on_true, on_false);
 
@@ -191,7 +192,6 @@ impl Translator {
 					IR::ExtraValue(self.get_val_name(post.ax()))
 				}
 				Opcode::LoadFalse => IR::LoadFalse(inst.a().into()),
-				Opcode::LFalseSkip => IR::LFalseSkip(inst.a().into()),
 				Opcode::LoadTrue => IR::LoadTrue(inst.a().into()),
 				Opcode::LoadNil => IR::LoadNil(inst.a().into(), inst.b()),
 				Opcode::GetUpval => IR::GetUpval(inst.a().into(), self.get_upval_name(inst.b())),

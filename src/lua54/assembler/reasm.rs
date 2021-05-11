@@ -15,6 +15,10 @@ struct Translator {
 
 enum Remap {
 	Fallthrough,
+	LFalseSkip {
+		inst: Inst,
+		jump: Target,
+	},
 	Loop {
 		inst: Inst,
 		jump: Target,
@@ -125,7 +129,6 @@ impl Translator {
 			IR::LoadK(a, b) => Inst::iabx(Opcode::LoadK, a, self.get_val_index(&b)),
 			IR::LoadKX(a) => Inst::iabc(Opcode::LoadKX, a, 0, 0),
 			IR::LoadFalse(a) => Inst::iabc(Opcode::LoadFalse, a, 0, 0),
-			IR::LFalseSkip(a) => Inst::iabc(Opcode::LFalseSkip, a, 0, 0),
 			IR::LoadTrue(a) => Inst::iabc(Opcode::LoadTrue, a, 0, 0),
 			IR::LoadNil(a, b) => Inst::iabc(Opcode::LoadNil, a, b, 0),
 			IR::GetUpval(a, b) => Inst::iabc(Opcode::GetUpval, a, self.get_upval_index(&b), 0),
@@ -250,6 +253,10 @@ impl Translator {
 		let next = trail.map(|v| v.label);
 
 		match ctrl {
+			Control::LFalseSkip(a, jump) => Remap::LFalseSkip {
+				inst: Inst::iabc(Opcode::LFalseSkip, a, 0, 0),
+				jump,
+			},
 			Control::Condition(cond, a, b) => {
 				let mut cmp = self.translate_condition(cond);
 				let (jump, fall) = match (has_fallthrough(&a, next), has_fallthrough(&b, next)) {
@@ -326,6 +333,10 @@ impl Translator {
 
 			match self.translate_control(blk.edge, iter.peek()) {
 				Remap::Fallthrough => {}
+				Remap::LFalseSkip { inst, jump } => {
+					inst_list.push(inst);
+					queue_control(&mut inst_list, &mut post_list, jump);
+				}
 				Remap::Loop { inst, jump, fall } => {
 					queue_control(&mut inst_list, &mut post_list, jump);
 					*inst_list.last_mut().unwrap() = inst;
