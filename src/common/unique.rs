@@ -17,7 +17,7 @@ impl<'a> Unique<'a> {
 	}
 
 	fn find(&mut self, raw: &str) -> String {
-		let name: Rc<str> = raw.to_case(Case::Pascal).into();
+		let name = raw.to_case(Case::Pascal).into();
 		let index = self.used.entry(Rc::clone(&name)).or_default();
 
 		*index += 1;
