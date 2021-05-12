@@ -16,8 +16,8 @@ struct Translator {
 enum Remap {
 	Fallthrough,
 	LFalseSkip {
-		inst: Inst,
-		jump: Target,
+		reg: u8,
+		jump: Option<Target>,
 	},
 	Loop {
 		inst: Inst,
@@ -63,6 +63,18 @@ fn has_jump(trail: Option<&Block>) -> bool {
 	trail
 		.map(|v| v.body.is_empty() && matches!(v.edge, Control::Unconditional(_)))
 		.unwrap_or_default()
+}
+
+// if our blocks point to the same output and the next block only has 1 instruction
+// we can reasonably emit a LFALSESKIP
+fn has_skip_target(target: &Target, trail: Option<&Block>) -> bool {
+	if let (&Target::Label(id), Some(trail)) = (target, trail) {
+		if let Control::Unconditional(Target::Label(label)) = trail.edge {
+			return trail.body.len() == 1 && id == label;
+		}
+	}
+
+	false
 }
 
 fn queue_control(inst_list: &mut Vec<Inst>, post_list: &mut Vec<Pending>, target: Target) {
@@ -253,10 +265,18 @@ impl Translator {
 		let next = trail.map(|v| v.label);
 
 		match ctrl {
-			Control::LFalseSkip(a, jump) => Remap::LFalseSkip {
-				inst: Inst::iabc(Opcode::LFalseSkip, a, 0, 0),
-				jump,
-			},
+			Control::LFalseSkip(a, jump) => {
+				let jump = if has_skip_target(&jump, trail) {
+					None
+				} else {
+					Some(jump)
+				};
+
+				Remap::LFalseSkip {
+					reg: a.into(),
+					jump,
+				}
+			}
 			Control::Condition(cond, a, b) => {
 				let mut cmp = self.translate_condition(cond);
 				let (jump, fall) = match (has_fallthrough(&a, next), has_fallthrough(&b, next)) {
@@ -333,10 +353,16 @@ impl Translator {
 
 			match self.translate_control(blk.edge, iter.peek()) {
 				Remap::Fallthrough => {}
-				Remap::LFalseSkip { inst, jump } => {
-					inst_list.push(inst);
-					queue_control(&mut inst_list, &mut post_list, jump);
-				}
+				Remap::LFalseSkip { reg, jump } => match jump {
+					Some(jump) => {
+						inst_list.push(Inst::iabc(Opcode::LoadFalse, reg, 0, 0));
+
+						queue_control(&mut inst_list, &mut post_list, jump);
+					}
+					None => {
+						inst_list.push(Inst::iabc(Opcode::LFalseSkip, reg, 0, 0));
+					}
+				},
 				Remap::Loop { inst, jump, fall } => {
 					queue_control(&mut inst_list, &mut post_list, jump);
 					*inst_list.last_mut().unwrap() = inst;
