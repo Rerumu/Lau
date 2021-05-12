@@ -43,7 +43,7 @@ where
 
 impl Serde for i8 {
 	fn ser(self, w: &mut dyn Write) -> Result<()> {
-		w.write_all(&[self as u8])
+		w.write_all(&self.to_le_bytes())
 	}
 
 	fn deser(input: &[u8]) -> Res<Self> {
