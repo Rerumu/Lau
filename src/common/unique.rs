@@ -3,13 +3,13 @@ use convert_case::{Case, Casing};
 use std::{collections::HashMap, rc::Rc};
 
 #[derive(Default)]
-struct Unique<'a> {
+struct Unique {
 	used: HashMap<Rc<str>, u32>,
-	prefix: &'a str,
+	prefix: &'static str,
 }
 
-impl<'a> Unique<'a> {
-	fn new(prefix: &'a str) -> Self {
+impl Unique {
+	fn new(prefix: &'static str) -> Self {
 		Self {
 			used: HashMap::new(),
 			prefix,
