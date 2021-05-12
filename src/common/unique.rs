@@ -2,6 +2,14 @@ use super::types::{Function, Named, Upvalue, Value};
 use convert_case::{Case, Casing};
 use std::{collections::HashMap, rc::Rc};
 
+fn re_case(raw: &str) -> String {
+	let mut name = raw.to_case(Case::Pascal);
+
+	name.truncate(12);
+
+	name
+}
+
 #[derive(Default)]
 struct Unique {
 	used: HashMap<Rc<str>, u32>,
@@ -16,8 +24,8 @@ impl Unique {
 		}
 	}
 
-	fn find(&mut self, raw: &str) -> String {
-		let name = raw.to_case(Case::Pascal).into();
+	fn alias(&mut self, raw: &str) -> String {
+		let name = re_case(raw).into();
 		let index = self.used.entry(Rc::clone(&name)).or_default();
 
 		*index += 1;
@@ -29,7 +37,7 @@ impl Unique {
 	where
 		M: Fn(&T) -> &str,
 	{
-		list.iter().map(ext).map(|v| self.find(v).into()).collect()
+		list.iter().map(ext).map(|v| self.alias(v).into()).collect()
 	}
 }
 
