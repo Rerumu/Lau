@@ -42,6 +42,97 @@ struct Pending {
 	target: Target,
 }
 
+struct Controller {
+	inst_list: Vec<Inst>,
+	label_map: HashMap<u32, i32>,
+	post_list: Vec<Pending>,
+}
+
+impl Controller {
+	fn new() -> Self {
+		Self {
+			inst_list: Vec::new(),
+			label_map: HashMap::new(),
+			post_list: Vec::new(),
+		}
+	}
+
+	fn add_jump(&mut self, target: Target) {
+		let pend = Pending {
+			position: self.inst_list.len(),
+			target,
+		};
+
+		self.add(Opcode::Jmp.into());
+		self.post_list.push(pend);
+	}
+
+	fn add(&mut self, inst: Inst) {
+		self.inst_list.push(inst);
+	}
+
+	fn add_targeted(&mut self, inst: Inst, target: Target) {
+		self.add_jump(target);
+		*self.inst_list.last_mut().unwrap() = inst;
+	}
+
+	fn add_odd_loop(&mut self, inst: Inst, jump: Target, id: u32) {
+		let has_id = self.label_map.contains_key(&id);
+
+		match inst.opcode() {
+			Opcode::ForLoop | Opcode::TForLoop if !has_id => {
+				self.add_jump(Target::Undefined(1));
+				self.add_jump(jump);
+				self.add_targeted(inst, Target::Undefined(-2));
+			}
+			Opcode::ForPrep if has_id => {
+				self.add_targeted(inst, Target::Undefined(0));
+				self.add_jump(jump);
+			}
+			Opcode::TForPrep if has_id => {
+				self.add_targeted(inst, Target::Undefined(1));
+				self.add_jump(jump);
+			}
+			_ => {
+				self.add_targeted(inst, jump);
+			}
+		}
+	}
+
+	fn redirect_jump_list(&mut self) {
+		for pend in &self.post_list {
+			let offset = match pend.target {
+				Target::Label(id) => self.label_map[&id] - pend.position as i32 - 1,
+				Target::Undefined(offset) => offset,
+			};
+
+			let repl = match self.inst_list[pend.position].opcode() {
+				Opcode::Jmp => Inst::isj(Opcode::Jmp, offset),
+				Opcode::ForLoop | Opcode::TForLoop => {
+					let inv = (-offset)
+						.try_into()
+						.expect("ForLoop and TForLoop must jump backward");
+
+					Inst::iabx(0.into(), 0, inv)
+				}
+				Opcode::ForPrep => {
+					let inv: u32 = offset.try_into().expect("ForPrep must jump forward");
+
+					Inst::iabx(0.into(), 0, inv - 1)
+				}
+				Opcode::TForPrep => {
+					let inv = offset.try_into().expect("TForPrep must jump forward");
+
+					Inst::iabx(0.into(), 0, inv)
+				}
+				_ => unreachable!(),
+			};
+
+			self.inst_list[pend.position].inner |= repl.inner;
+		}
+	}
+}
+
 fn wrap_vec(vec: Vec<Rc<str>>) -> HashMap<Rc<str>, u32> {
 	vec.into_iter()
 		.enumerate()
@@ -75,16 +166,6 @@ fn has_skip_target(target: &Target, trail: Option<&Block>) -> bool {
 	}
 
 	false
-}
-
-fn queue_control(inst_list: &mut Vec<Inst>, post_list: &mut Vec<Pending>, target: Target) {
-	let pend = Pending {
-		position: inst_list.len(),
-		target,
-	};
-
-	post_list.push(pend);
-	inst_list.push(Opcode::Jmp.into());
 }
 
 impl Translator {
@@ -333,9 +414,7 @@ impl Translator {
 	}
 
 	fn translate(self, block_list: Vec<Block>) -> Vec<Inst> {
-		let mut inst_list = Vec::new();
-		let mut post_list = Vec::new();
-		let mut label_map = HashMap::new();
+		let mut control = Controller::new();
 		let mut iter = block_list.into_iter().peekable();
 
 		// `0` entry point must be present
@@ -343,87 +422,63 @@ impl Translator {
 			Some(0) | None => {}
 			Some(_) => {
 				// jump to entry
-				queue_control(&mut inst_list, &mut post_list, Target::Label(0));
+				control.add_jump(Target::Label(0));
 			}
 		}
 
 		while let Some(blk) = iter.next() {
-			label_map.insert(blk.label, inst_list.len() as i32);
-			inst_list.extend(blk.body.into_iter().map(|v| self.translate_ir(v)));
+			control
+				.label_map
+				.insert(blk.label, control.inst_list.len() as i32);
+			control
+				.inst_list
+				.extend(blk.body.into_iter().map(|v| self.translate_ir(v)));
 
 			match self.translate_control(blk.edge, iter.peek()) {
 				Remap::Fallthrough => {}
 				Remap::LFalseSkip { reg, jump } => match jump {
 					Some(jump) => {
-						inst_list.push(Inst::iabc(Opcode::LoadFalse, reg, 0, 0));
-
-						queue_control(&mut inst_list, &mut post_list, jump);
+						control.add(Inst::iabc(Opcode::LoadFalse, reg, 0, 0));
+						control.add_jump(jump);
 					}
 					None => {
-						inst_list.push(Inst::iabc(Opcode::LFalseSkip, reg, 0, 0));
+						control.add(Inst::iabc(Opcode::LFalseSkip, reg, 0, 0));
 					}
 				},
 				Remap::Loop { inst, jump, fall } => {
-					queue_control(&mut inst_list, &mut post_list, jump);
-					*inst_list.last_mut().unwrap() = inst;
+					if let Target::Label(id) = jump {
+						control.add_odd_loop(inst, jump, id);
+					} else {
+						control.add_targeted(inst, jump);
+					}
 
 					if let Some(fall) = fall {
-						queue_control(&mut inst_list, &mut post_list, fall);
+						control.add_jump(fall);
 					}
 				}
 				Remap::Condition { cmp, jump, fall } => {
-					inst_list.push(cmp);
+					control.add(cmp);
 
 					if let Some(jump) = jump {
-						queue_control(&mut inst_list, &mut post_list, jump);
+						control.add_jump(jump);
 					}
 
 					if let Some(fall) = fall {
-						queue_control(&mut inst_list, &mut post_list, fall);
+						control.add_jump(fall);
 					}
 				}
 				Remap::Unconditional { target } => {
-					queue_control(&mut inst_list, &mut post_list, target);
+					control.add_jump(target);
 				}
 				Remap::Return { inst } => {
-					inst_list.push(inst);
+					control.add(inst);
 				}
 			}
 		}
 
-		for pend in post_list {
-			let offset = match pend.target {
-				Target::Label(id) => label_map[&id] - pend.position as i32 - 1,
-				Target::Undefined(offset) => offset,
-			};
-
-			let repl = match inst_list[pend.position].opcode() {
-				Opcode::Jmp => Inst::isj(Opcode::Jmp, offset),
-				Opcode::ForLoop | Opcode::TForLoop => {
-					let inv = (-offset)
-						.try_into()
-						.expect("ForLoop and TForLoop must jump backward");
-
-					Inst::iabx(0.into(), 0, inv)
-				}
-				Opcode::ForPrep => {
-					let inv: u32 = offset.try_into().expect("ForPrep must jump forward");
-
-					Inst::iabx(0.into(), 0, inv - 1)
-				}
-				Opcode::TForPrep => {
-					let inv = offset.try_into().expect("TForPrep must jump forward");
-
-					Inst::iabx(0.into(), 0, inv)
-				}
-				_ => unreachable!(),
-			};
-
-			inst_list[pend.position].inner |= repl.inner;
-		}
-
-		inst_list.shrink_to_fit();
-		inst_list
+		control.redirect_jump_list();
+		control.inst_list.shrink_to_fit();
+		control.inst_list
 	}
 }
 
