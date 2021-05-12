@@ -4,6 +4,7 @@ use crate::{
 };
 use bit_field::BitField;
 use num_enum::{FromPrimitive, IntoPrimitive, TryFromPrimitive};
+use std::convert::TryFrom;
 
 pub const LUA_MAGIC: &[u8] = b"\x1BLua\x54\x00";
 pub const LUA_DATA: &[u8] = b"\x19\x93\r\n\x1a\n";
@@ -48,7 +49,7 @@ impl Inst {
 	}
 
 	pub fn opcode(self) -> Opcode {
-		Opcode::from(self.inner.get_bits(0..7) as u8)
+		Opcode::from(u8::try_from(self.inner.get_bits(0..7)).unwrap())
 	}
 
 	pub fn k(self) -> bool {
