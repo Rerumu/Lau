@@ -5,6 +5,7 @@ use nom::{
 	number::complete::u8,
 };
 use std::{
+	convert::TryFrom,
 	io::{Result, Write},
 	iter::once,
 	mem::size_of,
@@ -19,7 +20,7 @@ pub fn dump_unsigned(mut val: Unsigned, w: &mut dyn Write) -> Result<()> {
 	let mut result = [0x80; UNSG_LEN];
 
 	for v in result.iter_mut().rev() {
-		*v = val as u8 & 0x7F;
+		*v = u8::try_from(val & 0x7F).unwrap();
 		val >>= 7;
 
 		if val == 0 {
