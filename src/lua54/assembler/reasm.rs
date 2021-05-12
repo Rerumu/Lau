@@ -85,11 +85,7 @@ impl Controller {
 				self.add_jump(jump);
 				self.add_targeted(inst, Target::Undefined(-2));
 			}
-			Opcode::ForPrep if has_id => {
-				self.add_targeted(inst, Target::Undefined(0));
-				self.add_jump(jump);
-			}
-			Opcode::TForPrep if has_id => {
+			Opcode::ForPrep | Opcode::TForPrep if has_id => {
 				self.add_targeted(inst, Target::Undefined(1));
 				self.add_jump(jump);
 			}
