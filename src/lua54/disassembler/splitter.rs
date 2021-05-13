@@ -12,7 +12,6 @@ pub struct Block {
 // breaks a stream of instructions into basic blocks
 // `label_set` contains a set of where a jump starts or ends
 // `target_map` contains a set of where a jump targets and its offset
-#[derive(Default)]
 pub struct Splitter {
 	label_set: BTreeSet<usize>,
 	target_map: HashMap<usize, i32>,
@@ -23,11 +22,16 @@ impl Splitter {
 	// code based on those indices and add a bit of useful information
 	// like the next label we jump to, or an undefined offset if the jump
 	// is not well formed
-	pub fn split(code: Vec<Inst>) -> Vec<Block> {
-		let mut breaker = Self::default();
+	pub fn new() -> Self {
+		Self {
+			label_set: BTreeSet::new(),
+			target_map: HashMap::new(),
+		}
+	}
 
-		breaker.find_edges(&code);
-		breaker.split_at_edges(code)
+	pub fn split(mut self, code: Vec<Inst>) -> Vec<Block> {
+		self.find_edges(&code);
+		self.split_at_edges(code)
 	}
 
 	fn add_target(&mut self, pc: usize, offset: i32) {

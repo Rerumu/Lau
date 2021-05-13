@@ -355,7 +355,7 @@ impl From<Proto> for Function<Block> {
 		let upval_name = upval_list.iter().map(|v| Rc::clone(&v.0)).collect();
 		let value_name = value_list.iter().map(|v| Rc::clone(&v.0)).collect();
 
-		let pre_list = Splitter::split(func.inst_list);
+		let pre_list = Splitter::new().split(func.inst_list);
 		let block_list = Translator::new(child_name, upval_name, value_name).translate(pre_list);
 
 		Function {
