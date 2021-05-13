@@ -76,6 +76,10 @@ fn dump_constant(value: &Value, w: &mut dyn Write) -> Result<()> {
 			u8::from(Constant::Number).ser(w)?;
 			n.ser(w)
 		}
+		Value::NoString => {
+			u8::from(Constant::ShortString).ser(w)?;
+			dump_integer(0_u64, w)
+		}
 		Value::String(s) => {
 			if s.len() < 40 {
 				u8::from(Constant::ShortString).ser(w)?;
