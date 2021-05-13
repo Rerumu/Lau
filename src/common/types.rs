@@ -18,6 +18,7 @@ pub enum Value {
 	True,
 	Integer(Integer),
 	Number(Number),
+	NoString,
 	String(String),
 }
 
@@ -29,6 +30,7 @@ impl Value {
 			Value::True => "true",
 			Value::Integer(_) => "integer",
 			Value::Number(_) => "number",
+			Value::NoString => "no string",
 			Value::String(v) => v.as_ref(),
 		}
 	}

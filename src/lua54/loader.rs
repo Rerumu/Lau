@@ -8,7 +8,7 @@ use crate::common::{
 };
 use nom::{
 	bytes::complete::{tag, take},
-	combinator::{map, map_opt, map_res, verify},
+	combinator::{map, map_res, verify},
 	multi::length_count,
 	number::complete::u8,
 };
@@ -46,8 +46,11 @@ fn load_string_opt(input: &[u8]) -> Res<Option<String>> {
 	Ok((input, Some(value)))
 }
 
-fn load_string(input: &[u8]) -> Res<String> {
-	map_opt(load_string_opt, |v| v)(input)
+fn load_string(input: &[u8]) -> Res<Value> {
+	map(load_string_opt, |s| match s {
+		Some(s) => Value::String(s),
+		None => Value::NoString,
+	})(input)
 }
 
 fn load_list<T, F>(func: F) -> impl Fn(&[u8]) -> Res<Vec<T>>
@@ -69,7 +72,7 @@ fn load_constant(input: &[u8]) -> Res<Value> {
 		Constant::True => (input, Value::True),
 		Constant::Integer => map(Integer::deser, Value::Integer)(input)?,
 		Constant::Number => map(Number::deser, Value::Number)(input)?,
-		Constant::ShortString | Constant::LongString => map(load_string, Value::String)(input)?,
+		Constant::ShortString | Constant::LongString => load_string(input)?,
 	};
 
 	Ok((input, value))
